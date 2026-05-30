@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remote Lab Monitor & Control</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --sidebar-bg: #1e293b;
+      --card-bg: #1a2744;
+      --tbl-hdr: #0f1e3a;
+      --border-color: #334155;
+      --text-main: #cbd5e1;
+      --text-title: #f1f5f9;
+      --text-muted: #64748b;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --danger: #ef4444;
+      --danger-soft: #450a0a;
+      --success: #4ade80;
+      --success-soft: #052e16;
+      --warning: #fbbf24;
+      --warning-soft: #7c2d12;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, Segoe UI, sans-serif; background: var(--bg); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+    .app { display: grid; grid-template-columns: 240px 1fr; height: 100vh; }
+
+    /* SIDEBAR */
+    .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border-color); padding: 20px 0; display: flex; flex-direction: column; }
+    .brand { padding: 0 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+    .brand-logo { width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #38bdf8, #22c55e); display: grid; place-items: center; font-weight: 800; color: white; }
+    .brand-title { font-size: 15px; font-weight: 700; color: var(--text-title); line-height: 1.2; }
+    .nav-section { font-size: 10px; font-weight: 600; color: #475569; letter-spacing: .08em; text-transform: uppercase; padding: 0 20px; margin: 16px 0 6px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; font-size: 13px; color: var(--text-main); transition: all .15s; border-left: 3px solid transparent; text-decoration: none; }
+    .nav-item:hover { color: var(--text-title); background: #273548; }
+    .nav-item.active { color: var(--primary); background: #0c2340; border-left-color: var(--primary); font-weight: 600; }
+    .badge { margin-left: auto; font-size: 10px; background: #1d4ed8; color: #bfdbfe; padding: 2px 6px; border-radius: 6px; }
+    .badge.warn { background: var(--warning-soft); color: var(--warning); }
+
+    /* MAIN CONTENT */
+    .main { display: flex; flex-direction: column; overflow: hidden; }
+    .topbar { background: var(--sidebar-bg); padding: 14px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+    .machine-info { display: flex; align-items: center; gap: 12px; }
+    .status-pill { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--success); background: var(--success-soft); padding: 4px 12px; border-radius: 20px; border: 1px solid #166534; font-weight: 600; }
+    .blink { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: blinker 1.2s infinite; }
+    @keyframes blinker { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+    .content-area { padding: 24px; overflow-y: auto; flex: 1; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* PANELS & CARDS COMPONENT */
+    .panel-hdr { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+    .panel-title { font-size: 18px; font-weight: 600; color: var(--text-title); }
+    .panel-subtitle { font-size: 13px; color: var(--text-muted); margin-left: auto; }
+    
+    .grid-2 { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 20px; margin-bottom: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 18px; }
+    
+    .stat-val { font-size: 24px; font-weight: 700; color: var(--primary); }
+    .stat-lbl { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* CONTROLS & BUTTONS */
+    .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+    .btn { border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; background: var(--primary); color: #0f172a; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s; }
+    .btn:hover { background: var(--primary-hover); }
+    .btn.secondary { background: #334155; color: var(--text-title); }
+    .btn.danger { background: var(--danger); color: white; }
+    .btn.warning { background: var(--warning); color: #0f172a; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* TABLES */
+    .table-wrap { background: #131f37; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border-color); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: var(--tbl-hdr); color: var(--text-muted); font-weight: 600; padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    td { padding: 10px 14px; color: var(--text-main); border-top: 1px solid var(--border-color); }
+    tr:hover td { background: #1e3257; }
+    
+    .badge-status { font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600; display: inline-block; }
+    .badge-status.run { background: var(--success-soft); color: var(--success); border: 1px solid #166534; }
+    .badge-status.stop { background: var(--danger-soft); color: var(--danger); border: 1px solid #7f1d1d; }
+
+    /* MODULE SPECIFIC */
+    .screen-container { background: #000; border-radius: var(--radius); overflow: hidden; position: relative; border: 4px solid var(--sidebar-bg); }
+    .screen-img { width: 100%; height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #0f172a, #1e3a5f); gap: 10px; }
+    .live-badge { display: flex; align-items: center; gap: 6px; background: var(--danger-soft); color: var(--danger); border: 1px solid #7f1d1d; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+    
+    .key-feed { background: #050b14; border-radius: var(--radius); padding: 14px; font-family: monospace; font-size: 13px; height: 200px; overflow-y: auto; border: 1px solid var(--border-color); margin-bottom: 12px; }
+    .key-line { display: flex; gap: 12px; padding: 3px 0; border-bottom: 1px dashed #1e293b; }
+    .key-ts { color: var(--text-muted); min-width: 65px; }
+    .key-app { color: var(--primary); min-width: 90px; font-weight: 600; }
+    .key-char { color: var(--success); }
+    .key-special { color: var(--warning); font-style: italic; }
+
+    .file-item { display: flex; align-items: center; gap: 12px; background: #131f37; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 16px; margin-bottom: 8px; cursor: pointer; }
+    .file-item:hover { background: #1e3257; }
+    .file-icon { font-size: 20px; color: var(--primary); }
+
+    .webcam-box { height: 220px; background: #000; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); margin-bottom: 14px; }
+
+    .power-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .power-card { background: #131f37; border: 1px solid var(--border-color); border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; transition: all 0.15s; }
+    .power-card:hover { border-color: var(--text-muted); background: #1e3257; }
+    .power-card.danger-zone:hover { border-color: var(--danger); background: var(--danger-soft); }
+    .power-icon { font-size: 32px; margin-bottom: 8px; }
+
+    .consent-box { border: 1px dashed var(--warning); background: #2c2514; color: #fef08a; border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-top: 14px; display: flex; align-items: flex-start; gap: 8px; }
+    .consent-box i { font-size: 16px; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">RL</div>
+        <div>
+          <div class="brand-title">Remote Lab</div>
+          <div style="font-size:11px;color:var(--text-muted)">VNU-HCMUS @2026</div>
+        </div>
+      </div>
+
+      <div class="nav-section">Giám sát tổng quan</div>
+      <a class="nav-item active" onclick="switchPanel('dashboard', this)"><i class="ti ti-layout-dashboard"></i> Dashboard Phòng Lab</a>
+
+      <div class="nav-section">Module chức năng</div>
+      <a class="nav-item" onclick="switchPanel('apps', this)"><i class="ti ti-apps"></i> Applications <span class="badge">5</span></a>
+      <a class="nav-item" onclick="switchPanel('procs', this)"><i class="ti ti-cpu"></i> Processes <span class="badge">47</span></a>
+      <a class="nav-item" onclick="switchPanel('screen', this)"><i class="ti ti-device-desktop"></i> Screenshot & Live</a>
+      <a class="nav-item" onclick="switchPanel('keylog', this)"><i class="ti ti-keyboard"></i> Keylogger <span class="badge warn">ON</span></a>
+      <a class="nav-item" onclick="switchPanel('files', this)"><i class="ti ti-folder-download"></i> File Sandbox</a>
+      <a class="nav-item" onclick="switchPanel('webcam', this)"><i class="ti ti-camera"></i> Webcam Stream</a>
+      <a class="nav-item" onclick="switchPanel('power', this)"><i class="ti ti-power"></i> Power Control</a>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 style="font-size:16px;color:var(--text-title)" id="current-target-lbl">Đang giám sát: Kali_Lab_01</h2>
+          <div style="font-size:12px;color:var(--text-muted)">IP cấp phát NAT: 10.0.2.15 · OS: Linux (Kali)</div>
+        </div>
+        <div class="machine-info">
+          <div class="status-pill"><div class="blink"></div>Hệ thống thông suốt</div>
+        </div>
+      </header>
+
+      <div class="content-area">
+
+        <div class="panel active" id="panel-dashboard">
+          <div class="panel-hdr">
+            <span class="panel-title">Hệ thống quản trị phòng thực hành</span>
+            <span class="panel-subtitle">Tổng quan realtime kết nối</span>
+          </div>
+          <div class="grid-4">
+            <div class="card"><div class="stat-lbl">Máy Lab trực tuyến</div><div class="stat-val">1 / 1</div></div>
+            <div class="card"><div class="stat-lbl">Tiến trình chạy ngầm</div><div class="stat-val" style="color:var(--warning)">47</div></div>
+            <div class="card"><div class="stat-lbl">Hành động ghi Log</div><div class="stat-val" style="color:var(--success)">128</div></div>
+            <div class="card"><div class="stat-lbl">Quyền tài khoản</div><div class="stat-val" style="color:white;font-size:18px;margin-top:6px">Giảng viên (Teacher)</div></div>
+          </div>
+          <div class="card">
+            <h3 style="font-size:15px;margin-bottom:12px;color:var(--text-title)">Nhật ký hành động hệ thống gần đây (Audit Log)</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Máy trạm</th><th>Trạng thái</th></tr></thead>
+                <tbody id="audit-log-rows">
+                  <tr><td>10:30:15</td><td>teacher@hcmus.edu.vn</td><td>TAKE_SCREENSHOT</td><td>Kali_Lab_01</td><td><span style="color:var(--success)">Thành công (Đã có Consent)</span></td></tr>
+                  <tr><td>10:28:40</td><td>teacher@hcmus.edu.vn</td><td>KILL_PROCESS (PID: 3100)</td><td>Kali_Lab_01</td><td><span style="color:var(--success)">Thành công</span></td></tr>
+                  <tr><td>10:25:11</td><td>teacher@hcmus.edu.vn</td><td>START_WEBCAM_REQUEST</td><td>Kali_Lab_01</td><td><span style="color:var(--danger)">Sinh viên từ chối (Denied)</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-apps">
+          <div class="panel-hdr">
+            <span class="panel-title">Ứng dụng (Applications Whitelist)</span>
+            <span class="panel-subtitle">Chỉ hiển thị và kiểm soát phần mềm được phép</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Tên ứng dụng</th><th>Trạng thái</th><th>Tác vụ tương tác</th></tr></thead>
+              <tbody>
+                <tr><td><strong>VS Code (Code)</strong></td><td><span class="badge-status run">Running</span></td><td><button class="btn danger" onclick="logAction('STOP_APP', 'VS Code')">Stop App</button></td></tr>
+                <tr><td><strong>Firefox Browser</strong></td><td><span class="badge-status run">Running</span></td><td><button class="btn danger" onclick="logAction('STOP_APP', 'Firefox')">Stop App</button></td></tr>
+                <tr><td><strong>Notepad</strong></td><td><span class="badge-status stop">Stopped</span></td><td><button class="btn" onclick="logAction('START_APP', 'Notepad')">Start App</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-procs">
+          <div class="panel-hdr">
+            <span class="panel-title">Danh sách tiến trình hệ thống (Processes)</span>
+            <span class="panel-subtitle">Liệt kê tất cả Task đang thực thi của máy trạm</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>PID</th><th>Tên tiến trình (Process Name)</th><th>CPU %</th><th>RAM</th><th>Xử lý</th></tr></thead>
+              <tbody>
+                <tr><td>1024</td><td>python3</td><td>1.2%</td><td>45 MB</td><td><button class="btn danger" onclick="logAction('KILL_PROCESS', 'PID 1024 (python3)')">Kill</button></td></tr>
+                <tr><td>2048</td><td>Xorg (Display server)</td><td>4.5%</td><td>120 MB</td><td><button class="btn secondary" disabled>Protected</button></td></tr>
+                <tr><td>3100</td><td>msfconsole</td><td>18.4%</td><td>340 MB</td><td><button class="btn danger" onclick="logAction('KILL_PROCESS', 'PID 3100 (msfconsole)')">Kill</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-screen">
+          <div class="panel-hdr">
+            <span class="panel-title">Xem và giám sát màn hình từ xa</span>
+          </div>
+          <div class="toolbar">
+            <button class="btn" onclick="triggerScreen('STATIC')"><i class="ti ti-camera"></i> Chụp ảnh màn hình</button>
+            <button class="btn secondary" onclick="triggerScreen('LIVE')"><i class="ti ti-live-view"></i> Chạy Live Stream (1 FPS)</button>
+            <button class="btn danger" id="btn-stop-screen" onclick="triggerScreen('STOP')" disabled>Dừng luồng stream</button>
+          </div>
+          <div class="screen-container">
+            <div class="screen-img" id="screen-display-area">
+              <i class="ti ti-device-desktop" style="font-size:48px;color:var(--text-muted)"></i>
+              <span style="color:var(--text-muted)">Chưa có luồng dữ liệu hình ảnh được nạp</span>
+            </div>
+          </div>
+          <div class="consent-box">
+            <i class="ti ti-info-circle"></i>
+            <div><strong>Giới hạn bảo mật & đạo đức:</strong> Khi bật chức năng này, hệ thống Agent dưới máy trạm bắt buộc hiển thị cảnh báo nổi trên góc phải màn hình của sinh viên để thông báo màn hình đang bị quản lý.</div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-keylog">
+          <div class="panel-hdr">
+            <span class="panel-title">Bắt phím kiểm tra (Keylogger Demo)</span>
+            <span class="panel-subtitle">Chỉ ghi nhận luồng phím trong phạm vi được thông báo công khai</span>
+          </div>
+          <div class="toolbar">
+            <button class="btn secondary" id="btn-toggle-kl" onclick="toggleKlState()">Tạm dừng bắt phím</button>
+            <button class="btn danger" onclick="clearKlArea()"><i class="ti ti-trash"></i> Xóa dữ liệu khung view</button>
+          </div>
+          <div class="key-feed" id="key-stream-area">
+            <div class="key-line"><span class="key-ts">10:22:01</span><span class="key-app">terminal</span><span class="key-char">sudo apt update</span></div>
+            <div class="key-line"><span class="key-ts">10:22:05</span><span class="key-app">terminal</span><span class="key-special">[Enter]</span></div>
+            <div class="key-line"><span class="key-ts">10:23:14</span><span class="key-app">firefox</span><span class="key-char">hcmus.edu.vn</span></div>
+          </div>
+          <div class="consent-box">
+            <i class="ti ti-shield-alert"></i>
+            <div><strong>Nguyên tắc minh bạch phòng Lab:</strong> Module keylogger này được cài đặt cơ chế sandbox chỉ ghi nhận phím khi sinh viên mở ô nhập liệu thực hành, không theo dõi lén thông tin cá nhân và mật khẩu hệ thống.</div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-files">
+          <div class="panel-hdr">
+            <span class="panel-title">Truy cập dữ liệu tệp tin (File Sandbox)</span>
+            <span class="panel-subtitle">Thư mục cấu hình an toàn: /home/kali/Downloads/</span>
+          </div>
+          <div class="file-grid">
+            <div class="file-item" onclick="logAction('DOWNLOAD_FILE', 'baitap_lab1.py')">
+              <i class="ti ti-brand-python file-icon" style="color:var(--warning)"></i>
+              <div class="file-name">baitap_lab1.py</div>
+              <div class="file-size">4.2 KB</div>
+              <i class="ti ti-download" style="color:var(--primary)"></i>
+            </div>
+            <div class="file-item" onclick="logAction('DOWNLOAD_FILE', 'ketqua_scan.txt')">
+              <i class="ti ti-file-text file-icon"></i>
+              <div class="file-name">ketqua_scan.txt</div>
+              <div class="file-size">105 KB</div>
+              <i class="ti ti-download" style="color:var(--primary)"></i>
+            </div>
+          </div>
+          <div class="consent-box">
+            <i class="ti ti-lock"></i>
+            <div><strong>An toàn thư mục gốc (Path Traversal Protection):</strong> Agent từ chối tuyệt đối mọi truy xuất lệnh nhảy cấp thư mục như `../../etc/passwd`. Chỉ được xem và tải file nằm trong vùng chỉ định.</div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-webcam">
+          <div class="panel-hdr">
+            <span class="panel-title">Kiểm soát thiết bị ghi hình (Webcam Access)</span>
+          </div>
+          <div class="toolbar">
+            <button class="btn" onclick="triggerWebcam(true)"><i class="ti ti-video"></i> Yêu cầu luồng Webcam</button>
+            <button class="btn danger" onclick="triggerWebcam(false)">Tắt Webcam</button>
+          </div>
+          <div class="webcam-box" id="webcam-display-box">
+            <div style="text-align:center;color:var(--text-muted)">
+              <i class="ti ti-camera-off" style="font-size:40px;margin-bottom:8px"></i>
+              <div>Webcam đang đóng</div>
+            </div>
+          </div>
+          <div class="consent-box">
+            <i class="ti ti-user-check"></i>
+            <div><strong>Yêu cầu bắt buộc sự đồng ý (Consent Model):</strong> Luồng webcam hoàn toàn không thể kích hoạt lén. Một hộp thoại popup xác nhận rõ ràng sẽ hiện bên phía sinh viên. Nếu chọn từ chối, Server sẽ lập tức hủy phiên làm việc.</div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-power">
+          <div class="panel-hdr">
+            <span class="panel-title">Điều khiển nguồn điện máy tính trạm</span>
+            <span class="panel-subtitle">Hành động nhạy cảm - Cần thực hiện có trách nhiệm</span>
+          </div>
+          <div class="power-grid">
+            <div class="power-card animate" onclick="triggerPower('RESTART')">
+              <div class="power-icon" style="color:var(--warning)"><i class="ti ti-refresh"></i></div>
+              <div class="power-name">Khởi động lại (Restart)</div>
+              <div class="power-desc">Làm mới hệ điều hành máy trạm</div>
+            </div>
+            <div class="power-card danger-zone" onclick="triggerPower('SHUTDOWN')">
+              <div class="power-icon" style="color:var(--danger)"><i class="ti ti-power"></i></div>
+              <div class="power-name">Tắt máy nguồn từ xa (Shutdown)</div>
+              <div class="power-desc">Sập nguồn hoàn toàn máy trạm mục tiêu</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Hàm xử lý đổi màn hình (Single Page Application Logic)
+    function switchPanel(panelId, element) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      
+      document.getElementById('panel-' + panelId).classList.add('active');
+      element.classList.add('active');
+    }
+
+    // Kết nối WebSocket trực tiếp đến Windows Server
+    const socket = io();
+
+    socket.on('connect', () => {
+      console.log("✅ Trình duyệt Web Control Panel kết nối thành công tới Server!");
+    });
+
+    // Hàm phát lệnh điều khiển qua mạng cho các tác vụ cơ bản
+    function logAction(actionType, targetName) {
+      alert(`Đang phát lệnh yêu cầu thực hiện hành động: ${actionType} trên đối tượng: ${targetName}`);
+      socket.emit('client_command', { action: actionType, target: 'Kali_Lab_01', detail: targetName });
+      addAuditRow(actionType, 'Kali_Lab_01', 'Đang gửi qua socket...');
+    }
+
+    // Module 3 & 6: Điều khiển luồng Screen & Webcam
+    function triggerScreen(type) {
+      const display = document.getElementById('screen-display-area');
+      const stopBtn = document.getElementById('btn-stop-screen');
+
+      if(type === 'STATIC') {
+        display.innerHTML = `<i class="ti ti-device-desktop" style="font-size:48px;color:var(--success)"></i><span style="color:var(--success);font-weight:600">Đang chụp ảnh màn hình...</span>`;
+        socket.emit('client_command', { action: 'SCREENSHOT', target: 'Kali_Lab_01' });
+      } else if (type === 'LIVE') {
+        display.innerHTML = `<div class="live-badge"><div class="blink"></div>LIVE VIEWING - 1 FPS</div>`;
+        stopBtn.disabled = false;
+        socket.emit('client_command', { action: 'START_STREAM', target: 'Kali_Lab_01' });
+      } else {
+        display.innerHTML = `<i class="ti ti-device-desktop" style="font-size:48px;color:var(--text-muted)"></i><span style="color:var(--text-muted)">Đã ngừng luồng phát nhận dữ liệu</span>`;
+        stopBtn.disabled = true;
+        socket.emit('client_command', { action: 'STOP_STREAM', target: 'Kali_Lab_01' });
+      }
+    }
+
+    function triggerWebcam(isOn) {
+      const box = document.getElementById('webcam-display-box');
+      if(isOn) {
+        box.innerHTML = `<div style="color:var(--success);font-weight:600;text-align:center;"><i class="ti ti-camera" style="font-size:40px;margin-bottom:8px;color:var(--primary)"></i><div>Đang gửi yêu cầu Consent xuống máy trạm...</div></div>`;
+        socket.emit('client_command', { action: 'WEBCAM_START', target: 'Kali_Lab_01' });
+      } else {
+        box.innerHTML = `<div style="text-align:center;color:var(--text-muted)"><i class="ti ti-camera-off" style="font-size:40px;margin-bottom:8px"></i><div>Webcam đã tắt thành công</div></div>`;
+        socket.emit('client_command', { action: 'WEBCAM_STOP', target: 'Kali_Lab_01' });
+      }
+    }
+
+    // Module 4: Quản lý trạng thái Keylogger Demo
+    let klCapturing = true;
+    function toggleKlState() {
+      klCapturing = !klCapturing;
+      document.getElementById('btn-toggle-kl').textContent = klCapturing ? "Tạm dừng bắt phím" : "Tiếp tục bắt phím";
+    }
+    function clearKlArea() {
+      document.getElementById('key-stream-area').innerHTML = `<div style="color:var(--text-muted);font-style:italic">Dữ liệu log phím tạm thời trống...</div>`;
+    }
+
+    // Module 7: Thao tác Power Control nguy hiểm cần xác nhận dữ liệu
+    function triggerPower(type) {
+      const check = confirm(`CẢNH BÁO: Bạn có chắc chắn gửi lệnh cưỡng bức mạng [${type}] tới máy Kali_Lab_01 không? Tất cả dữ liệu chưa lưu của sinh viên sẽ bị mất.`);
+      if(check) {
+        socket.emit('client_command', { action: type, target: 'Kali_Lab_01' });
+        addAuditRow(type, 'Kali_Lab_01', 'Đã bắn lệnh hủy nguồn');
+      }
+    }
+
+    // Hàm phụ trợ tự động cập nhật bảng Audit Log trên màn hình chính cho trực quan
+    function addAuditRow(act, mach, status) {
+      const body = document.getElementById('audit-log-rows');
+      const timeStr = new Date().toLocaleTimeString();
+      const row = document.createElement('tr');
+      row.innerHTML = `<td>${timeStr}</td><td>teacher@hcmus.edu.vn</td><td><strong>${act}</strong></td><td>${mach}</td><td><span>${status}</span></td>`;
+      body.insertBefore(row, body.firstChild);
+    }
+  </script>
+</body>
+</html>
