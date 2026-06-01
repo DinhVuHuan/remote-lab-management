@@ -47,9 +47,16 @@
     /* MAIN CONTENT */
     .main { display: flex; flex-direction: column; overflow: hidden; }
     .topbar { background: var(--sidebar-bg); padding: 14px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+    .machine-selector-wrapper { display: flex; align-items: center; gap: 10px; }
+    
+    .select-machine { background: var(--bg); color: var(--text-title); border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; outline: none; cursor: pointer; min-width: 160px; transition: border-color 0.15s; }
+    .select-machine:focus { border-color: var(--primary); }
+
     .machine-info { display: flex; align-items: center; gap: 12px; }
     .status-pill { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--success); background: var(--success-soft); padding: 4px 12px; border-radius: 20px; border: 1px solid #166534; font-weight: 600; }
+    .status-pill.offline { color: var(--danger); background: var(--danger-soft); border-color: #7f1d1d; }
     .blink { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: blinker 1.2s infinite; }
+    .status-pill.offline .blink { background: var(--danger); animation: none; }
     @keyframes blinker { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
     .content-area { padding: 24px; overflow-y: auto; flex: 1; }
@@ -132,8 +139,8 @@
       <a class="nav-item active" onclick="switchPanel('dashboard', this)"><i class="ti ti-layout-dashboard"></i> Dashboard Phòng Lab</a>
 
       <div class="nav-section">Module chức năng</div>
-      <a class="nav-item" onclick="switchPanel('apps', this)"><i class="ti ti-apps"></i> Applications <span class="badge">5</span></a>
-      <a class="nav-item" onclick="switchPanel('procs', this)"><i class="ti ti-cpu"></i> Processes <span class="badge">47</span></a>
+      <a class="nav-item" onclick="switchPanel('apps', this)"><i class="ti ti-apps"></i> Applications <span class="badge">3</span></a>
+      <a class="nav-item" onclick="switchPanel('procs', this)"><i class="ti ti-cpu"></i> Processes <span class="badge" id="sidebar-proc-badge">0</span></a>
       <a class="nav-item" onclick="switchPanel('screen', this)"><i class="ti ti-device-desktop"></i> Screenshot & Live</a>
       <a class="nav-item" onclick="switchPanel('keylog', this)"><i class="ti ti-keyboard"></i> Keylogger <span class="badge warn">ON</span></a>
       <a class="nav-item" onclick="switchPanel('files', this)"><i class="ti ti-folder-download"></i> File Sandbox</a>
@@ -143,12 +150,14 @@
 
     <main class="main">
       <header class="topbar">
-        <div>
-          <h2 style="font-size:16px;color:var(--text-title)" id="current-target-lbl">Đang giám sát: Kali_Lab_01</h2>
-          <div style="font-size:12px;color:var(--text-muted)">IP cấp phát NAT: 10.0.2.15 · OS: Linux (Kali)</div>
+        <div class="machine-selector-wrapper">
+          <label for="machine-select" style="font-size: 13px; font-weight: 600; color: var(--text-muted)">MÁY MỤC TIÊU:</label>
+          <select id="machine-select" class="select-machine" onchange="onTargetMachineChange()">
+            <option value="">-- Trống (Offline) --</option>
+          </select>
         </div>
         <div class="machine-info">
-          <div class="status-pill"><div class="blink"></div>Hệ thống thông suốt</div>
+          <div id="global-status-pill" class="status-pill offline"><div class="blink"></div>Chưa chọn thiết bị</div>
         </div>
       </header>
 
@@ -160,8 +169,8 @@
             <span class="panel-subtitle">Tổng quan realtime kết nối</span>
           </div>
           <div class="grid-4">
-            <div class="card"><div class="stat-lbl">Máy Lab trực tuyến</div><div class="stat-val">1 / 1</div></div>
-            <div class="card"><div class="stat-lbl">Tiến trình chạy ngầm</div><div class="stat-val" style="color:var(--warning)">47</div></div>
+            <div class="card"><div class="stat-lbl">Máy Lab trực tuyến</div><div class="stat-val" id="total-online-machines-lbl">0</div></div>
+            <div class="card"><div class="stat-lbl">Tiến trình (Máy đang chọn)</div><div class="stat-val" id="total-procs-lbl" style="color:var(--warning)">0</div></div>
             <div class="card"><div class="stat-lbl">Hành động ghi Log</div><div class="stat-val" style="color:var(--success)">128</div></div>
             <div class="card"><div class="stat-lbl">Quyền tài khoản</div><div class="stat-val" style="color:white;font-size:18px;margin-top:6px">Giảng viên (Teacher)</div></div>
           </div>
@@ -172,8 +181,6 @@
                 <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Máy trạm</th><th>Trạng thái</th></tr></thead>
                 <tbody id="audit-log-rows">
                   <tr><td>10:30:15</td><td>teacher@hcmus.edu.vn</td><td>TAKE_SCREENSHOT</td><td>Kali_Lab_01</td><td><span style="color:var(--success)">Thành công (Đã có Consent)</span></td></tr>
-                  <tr><td>10:28:40</td><td>teacher@hcmus.edu.vn</td><td>KILL_PROCESS (PID: 3100)</td><td>Kali_Lab_01</td><td><span style="color:var(--success)">Thành công</span></td></tr>
-                  <tr><td>10:25:11</td><td>teacher@hcmus.edu.vn</td><td>START_WEBCAM_REQUEST</td><td>Kali_Lab_01</td><td><span style="color:var(--danger)">Sinh viên từ chối (Denied)</span></td></tr>
                 </tbody>
               </table>
             </div>
@@ -199,16 +206,14 @@
 
         <div class="panel" id="panel-procs">
           <div class="panel-hdr">
-            <span class="panel-title">Danh sách tiến trình hệ thống (Processes)</span>
-            <span class="panel-subtitle">Liệt kê tất cả Task đang thực thi của máy trạm</span>
+            <span class="panel-title">Danh sách tiến trình hệ thống (Processes từ Agent)</span>
+            <span class="panel-subtitle">Liệt kê top 15 tiến trình thật quét định kỳ qua Socket</span>
           </div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>PID</th><th>Tên tiến trình (Process Name)</th><th>CPU %</th><th>RAM</th><th>Xử lý</th></tr></thead>
-              <tbody>
-                <tr><td>1024</td><td>python3</td><td>1.2%</td><td>45 MB</td><td><button class="btn danger" onclick="logAction('KILL_PROCESS', 'PID 1024 (python3)')">Kill</button></td></tr>
-                <tr><td>2048</td><td>Xorg (Display server)</td><td>4.5%</td><td>120 MB</td><td><button class="btn secondary" disabled>Protected</button></td></tr>
-                <tr><td>3100</td><td>msfconsole</td><td>18.4%</td><td>340 MB</td><td><button class="btn danger" onclick="logAction('KILL_PROCESS', 'PID 3100 (msfconsole)')">Kill</button></td></tr>
+              <tbody id="process-table-body">
+                <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Vui lòng chọn hoặc bật máy trạm mục tiêu để xem luồng dữ liệu...</td></tr>
               </tbody>
             </table>
           </div>
@@ -246,8 +251,6 @@
           </div>
           <div class="key-feed" id="key-stream-area">
             <div class="key-line"><span class="key-ts">10:22:01</span><span class="key-app">terminal</span><span class="key-char">sudo apt update</span></div>
-            <div class="key-line"><span class="key-ts">10:22:05</span><span class="key-app">terminal</span><span class="key-special">[Enter]</span></div>
-            <div class="key-line"><span class="key-ts">10:23:14</span><span class="key-app">firefox</span><span class="key-char">hcmus.edu.vn</span></div>
           </div>
           <div class="consent-box">
             <i class="ti ti-shield-alert"></i>
@@ -265,12 +268,6 @@
               <i class="ti ti-brand-python file-icon" style="color:var(--warning)"></i>
               <div class="file-name">baitap_lab1.py</div>
               <div class="file-size">4.2 KB</div>
-              <i class="ti ti-download" style="color:var(--primary)"></i>
-            </div>
-            <div class="file-item" onclick="logAction('DOWNLOAD_FILE', 'ketqua_scan.txt')">
-              <i class="ti ti-file-text file-icon"></i>
-              <div class="file-name">ketqua_scan.txt</div>
-              <div class="file-size">105 KB</div>
               <i class="ti ti-download" style="color:var(--primary)"></i>
             </div>
           </div>
@@ -324,6 +321,9 @@
   </div>
 
   <script>
+    // Biến toàn cục lưu trữ máy đang được chọn điều khiển
+    let targetMachine = "";
+
     // Hàm xử lý đổi màn hình (Single Page Application Logic)
     function switchPanel(panelId, element) {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -333,51 +333,162 @@
       element.classList.add('active');
     }
 
-    // Kết nối WebSocket trực tiếp đến Windows Server
+    // Kết nối WebSocket trực tiếp tới Windows Server
     const socket = io();
 
     socket.on('connect', () => {
       console.log("✅ Trình duyệt Web Control Panel kết nối thành công tới Server!");
     });
 
-    // Hàm phát lệnh điều khiển qua mạng cho các tác vụ cơ bản
-    function logAction(actionType, targetName) {
-      alert(`Đang phát lệnh yêu cầu thực hiện hành động: ${actionType} trên đối tượng: ${targetName}`);
-      socket.emit('client_command', { action: actionType, target: 'Kali_Lab_01', detail: targetName });
-      addAuditRow(actionType, 'Kali_Lab_01', 'Đang gửi qua socket...');
+    // 🔄 TỰ ĐỘNG CẬP NHẬT TAB CHỌN MÁY THEO THỜI GIAN THỰC TỪ SERVER 
+    let currentOnlineList = new Set();
+
+    // Lắng nghe dữ liệu tiến trình từ Agent đổ về
+    socket.on('server_send_procs_to_web', (data) => {
+      if (!currentOnlineList.has(data.machine_name)) {
+        currentOnlineList.add(data.machine_name);
+        updateMachineDropdown();
+      }
+
+      if (data.machine_name === targetMachine) {
+        const tbody = document.getElementById('process-table-body');
+        tbody.innerHTML = ""; 
+        
+        data.processes.forEach(proc => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${proc.pid}</td>
+            <td><strong>${proc.name}</strong></td>
+            <td style="color:var(--warning)">${proc.cpu}</td>
+            <td>${proc.ram}</td>
+            <td>
+              <button class="btn danger" onclick="logAction('KILL_PROCESS', 'PID ${proc.pid} (${proc.name})')">Kill</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        document.getElementById('sidebar-proc-badge').textContent = data.processes.length;
+        document.getElementById('total-procs-lbl').textContent = data.processes.length;
+      }
+    });
+
+    // Hàm đồng bộ danh sách thiết bị vào Dropdown thẻ Select
+    function updateMachineDropdown() {
+      const select = document.getElementById('machine-select');
+      const savedTarget = targetMachine; 
+      
+      select.innerHTML = "";
+      
+      if (currentOnlineList.size === 0) {
+        select.innerHTML = '<option value="">-- Trống (Offline) --</option>';
+        updateStatusPill(false);
+        return;
+      }
+
+      currentOnlineList.forEach(machine => {
+        const opt = document.createElement('option');
+        opt.value = machine;
+        opt.textContent = machine;
+        select.appendChild(opt);
+      });
+
+      if (currentOnlineList.has(savedTarget)) {
+        select.value = savedTarget;
+      } else {
+        select.value = Array.from(currentOnlineList)[0];
+        targetMachine = select.value;
+      }
+      
+      document.getElementById('total-online-machines-lbl').textContent = currentOnlineList.size;
+      updateStatusPill(true);
     }
 
-    // Module 3 & 6: Điều khiển luồng Screen & Webcam
+    // Xử lý sự kiện khi Giảng viên chủ động click đổi máy mục tiêu trên Dropdown
+    function onTargetMachineChange() {
+      const select = document.getElementById('machine-select');
+      targetMachine = select.value;
+      
+      const tbody = document.getElementById('process-table-body');
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Đang nạp luồng tiến trình thời gian thực của máy [${targetMachine}]...</td></tr>`;
+      
+      document.getElementById('sidebar-proc-badge').textContent = "0";
+      document.getElementById('total-procs-lbl').textContent = "0";
+      
+      if(targetMachine) {
+        updateStatusPill(true);
+      } else {
+        updateStatusPill(false);
+      }
+    }
+
+    function updateStatusPill(isOnline) {
+      const pill = document.getElementById('global-status-pill');
+      if(isOnline) {
+        pill.className = "status-pill";
+        pill.innerHTML = `<div class="blink"></div>Đang khiển: ${targetMachine}`;
+      } else {
+        pill.className = "status-pill offline";
+        pill.innerHTML = `<div class="blink"></div>Không có thiết bị kết nối`;
+      }
+    }
+
+    let lastSeenTimers = {};
+    socket.on('server_send_procs_to_web', (data) => {
+      clearTimeout(lastSeenTimers[data.machine_name]);
+      lastSeenTimers[data.machine_name] = setTimeout(() => {
+        currentOnlineList.delete(data.machine_name);
+        if(targetMachine === data.machine_name) {
+          targetMachine = "";
+        }
+        updateMachineDropdown();
+      }, 12000); 
+    });
+
+    // Hàm phát lệnh điều khiển qua mạng
+    function logAction(actionType, targetName) {
+      if(!targetMachine) {
+        alert("LỖI: Vui lòng chọn hoặc chờ thiết bị Agent kết nối trước khi ra lệnh!");
+        return;
+      }
+      console.log(`Đang phát lệnh: ${actionType} -> ${targetName} trên máy ${targetMachine}`);
+      socket.emit('client_command', { action: actionType, target: targetMachine, detail: targetName });
+      addAuditRow(actionType, targetMachine, 'Đã chuyển tiếp qua Socket');
+    }
+
+    // Module Screen & Webcam
     function triggerScreen(type) {
+      if(!targetMachine) return alert("Chưa chọn máy trạm!");
       const display = document.getElementById('screen-display-area');
       const stopBtn = document.getElementById('btn-stop-screen');
 
       if(type === 'STATIC') {
         display.innerHTML = `<i class="ti ti-device-desktop" style="font-size:48px;color:var(--success)"></i><span style="color:var(--success);font-weight:600">Đang chụp ảnh màn hình...</span>`;
-        socket.emit('client_command', { action: 'SCREENSHOT', target: 'Kali_Lab_01' });
+        socket.emit('client_command', { action: 'SCREENSHOT', target: targetMachine });
       } else if (type === 'LIVE') {
         display.innerHTML = `<div class="live-badge"><div class="blink"></div>LIVE VIEWING - 1 FPS</div>`;
         stopBtn.disabled = false;
-        socket.emit('client_command', { action: 'START_STREAM', target: 'Kali_Lab_01' });
+        socket.emit('client_command', { action: 'START_STREAM', target: targetMachine });
       } else {
         display.innerHTML = `<i class="ti ti-device-desktop" style="font-size:48px;color:var(--text-muted)"></i><span style="color:var(--text-muted)">Đã ngừng luồng phát nhận dữ liệu</span>`;
         stopBtn.disabled = true;
-        socket.emit('client_command', { action: 'STOP_STREAM', target: 'Kali_Lab_01' });
+        socket.emit('client_command', { action: 'STOP_STREAM', target: targetMachine });
       }
     }
 
     function triggerWebcam(isOn) {
+      if(!targetMachine) return alert("Chưa chọn máy trạm!");
       const box = document.getElementById('webcam-display-box');
       if(isOn) {
         box.innerHTML = `<div style="color:var(--success);font-weight:600;text-align:center;"><i class="ti ti-camera" style="font-size:40px;margin-bottom:8px;color:var(--primary)"></i><div>Đang gửi yêu cầu Consent xuống máy trạm...</div></div>`;
-        socket.emit('client_command', { action: 'WEBCAM_START', target: 'Kali_Lab_01' });
+        socket.emit('client_command', { action: 'WEBCAM_START', target: targetMachine });
       } else {
         box.innerHTML = `<div style="text-align:center;color:var(--text-muted)"><i class="ti ti-camera-off" style="font-size:40px;margin-bottom:8px"></i><div>Webcam đã tắt thành công</div></div>`;
-        socket.emit('client_command', { action: 'WEBCAM_STOP', target: 'Kali_Lab_01' });
+        socket.emit('client_command', { action: 'WEBCAM_STOP', target: targetMachine });
       }
     }
 
-    // Module 4: Quản lý trạng thái Keylogger Demo
+    // Module Keylogger state
     let klCapturing = true;
     function toggleKlState() {
       klCapturing = !klCapturing;
@@ -387,16 +498,42 @@
       document.getElementById('key-stream-area').innerHTML = `<div style="color:var(--text-muted);font-style:italic">Dữ liệu log phím tạm thời trống...</div>`;
     }
 
-    // Module 7: Thao tác Power Control nguy hiểm cần xác nhận dữ liệu
+    // Module Power Control cưỡng bức
     function triggerPower(type) {
-      const check = confirm(`CẢNH BÁO: Bạn có chắc chắn gửi lệnh cưỡng bức mạng [${type}] tới máy Kali_Lab_01 không? Tất cả dữ liệu chưa lưu của sinh viên sẽ bị mất.`);
+      if(!targetMachine) return alert("Chưa chọn máy trạm!");
+      const check = confirm(`CẢNH BÁO: Bạn có chắc chắn gửi lệnh mạng [${type}] tới máy ${targetMachine} không? Tất cả dữ liệu chưa lưu của sinh viên sẽ bị mất.`);
       if(check) {
-        socket.emit('client_command', { action: type, target: 'Kali_Lab_01' });
-        addAuditRow(type, 'Kali_Lab_01', 'Đã bắn lệnh hủy nguồn');
+        socket.emit('client_command', { action: type, target: targetMachine });
+        addAuditRow(type, targetMachine, 'Đã bắn lệnh hủy nguồn');
       }
     }
 
-    // Hàm phụ trợ tự động cập nhật bảng Audit Log trên màn hình chính cho trực quan
+    // 🔄 LẮNG NGHE SỰ KIỆN ONLINE/OFFLINE TỪ SERVER ĐỂ TỰ ĐỘNG GHI LOG LÊN WEB INTERFACE
+    socket.on('server_send_audit_to_web', (data) => {
+      console.log("Nhận log trạng thái máy trạm:", data);
+      
+      let statusStyle = "";
+      if (data.action === 'AGENT_ONLINE') {
+        statusStyle = `style="color: var(--success); font-weight: bold;"`;
+      } else if (data.action === 'AGENT_OFFLINE') {
+        statusStyle = `style="color: var(--danger); font-weight: bold;"`;
+      }
+
+      const body = document.getElementById('audit-log-rows');
+      const timeStr = new Date().toLocaleTimeString();
+      const row = document.createElement('tr');
+      
+      row.innerHTML = `
+        <td>${timeStr}</td>
+        <td>Hệ thống (System)</td>
+        <td><strong>${data.action}</strong></td>
+        <td>${data.machine_name}</td>
+        <td><span ${statusStyle}>${data.status}</span></td>
+      `;
+      body.insertBefore(row, body.firstChild);
+    });
+
+    // Tự động thêm hàng vào bảng Audit Log cho trực quan
     function addAuditRow(act, mach, status) {
       const body = document.getElementById('audit-log-rows');
       const timeStr = new Date().toLocaleTimeString();

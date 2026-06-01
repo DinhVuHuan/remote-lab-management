@@ -1,5 +1,6 @@
 chạy server:
 
+ cd backend-server
  node server.js  
 
 chạy agent:

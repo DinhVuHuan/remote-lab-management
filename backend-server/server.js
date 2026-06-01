@@ -2,17 +2,17 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path'); // Thêm thư viện xử lý đường dẫn hệ thống
+const path = require('path');
 
 const app = express();
-app.use(cors()); // Cho phép kết nối xuyên nguồn (CORS)
+app.use(cors());
 
-// 🎯 Phục vụ các file tĩnh (HTML, CSS, JS) nằm trong thư mục 'public'
+// Phục vụ các file tĩnh (HTML, CSS, JS) nằm trong thư mục 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: "*" } // Nhận kết nối từ cả Web App lẫn Agent
+    cors: { origin: "*" }
 });
 
 // Object quản lý danh sách các máy trạm (Agent) đang online
@@ -26,16 +26,21 @@ io.on('connection', (socket) => {
         registeredAgents[data.machine_name] = socket.id;
         console.log(`📌 MÁY ẢO ĐÃ ĐĂNG KÝ THÀNH CÔNG: [${data.machine_name}] -> Socket ID: ${socket.id}`);
         console.log("Danh sách máy phòng Lab đang online:", Object.keys(registeredAgents));
+
+        // 🎯 BẮN SỰ KIỆN ONLINE VỀ WEB INTERFACE để cập nhật Audit Log
+        io.emit('server_send_audit_to_web', {
+            action: 'AGENT_ONLINE',
+            machine_name: data.machine_name,
+            status: 'Kết nối thành công (Online)'
+        });
     });
 
     // 2. Nhận lệnh điều khiển từ Trình duyệt Web gửi lên và chuyển tiếp (Forward) xuống Agent
     socket.on('client_command', (data) => {
         console.log(`🎮 Web ra lệnh: [${data.action}] gửi tới máy trạm: [${data.target}]`);
 
-        // Tìm Socket ID của máy Kali mục tiêu dựa trên danh sách đang online
         const agentSocketId = registeredAgents[data.target];
         if (agentSocketId) {
-            // Bắn lệnh thẳng xuống đúng máy Kali đó qua giao thức room/direct emit
             io.to(agentSocketId).emit('server_to_agent_cmd', { action: data.action, detail: data.detail });
             console.log(`👉 Đã chuyển tiếp lệnh [${data.action}] xuống Socket ID của Agent: ${agentSocketId}`);
         } else {
@@ -43,15 +48,27 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Nhận dữ liệu tiến trình thật từ Agent và chuyển tiếp về Web App
+    socket.on('agent_send_procs', (data) => {
+        io.emit('server_send_procs_to_web', data);
+    });
+
     // 3. Xử lý khi có bất kỳ thiết bị nào (Web hoặc Agent) ngắt kết nối
     socket.on('disconnect', () => {
         console.log(`[-] Thiết bị ngắt kết nối: ${socket.id}`);
-        // Tự động tìm và xóa máy ra khỏi danh sách online
+
         for (let name in registeredAgents) {
             if (registeredAgents[name] === socket.id) {
                 delete registeredAgents[name];
                 console.log(`❌ Máy [${name}] đã Offline.`);
                 console.log("Danh sách máy phòng Lab còn lại:", Object.keys(registeredAgents));
+
+                // 🎯 BẮN SỰ KIỆN OFFLINE VỀ WEB INTERFACE để cập nhật Audit Log
+                io.emit('server_send_audit_to_web', {
+                    action: 'AGENT_OFFLINE',
+                    machine_name: name,
+                    status: 'Mất kết nối (Offline)'
+                });
             }
         }
     });
