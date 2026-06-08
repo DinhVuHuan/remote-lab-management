@@ -7,8 +7,11 @@ const path = require('path');
 const app = express();
 app.use(cors());
 
-// Phục vụ các file tĩnh (HTML, CSS, JS) nằm trong thư mục 'public'
-app.use(express.static(path.join(__dirname, 'public')));
+// Phục vụ trực tiếp mã nguồn frontend khi dùng Vite
+app.use('/src', express.static(path.join(__dirname, '../frontend/src')));
+
+// Phục vụ các file tĩnh khác như index.html nằm trong thư mục 'public'
+app.use(express.static(path.join(__dirname, '../frontend/public')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
