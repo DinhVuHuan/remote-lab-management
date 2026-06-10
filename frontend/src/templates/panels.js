@@ -66,7 +66,7 @@ export const screenPanel = `
   </div>
   <div class="toolbar">
     <button class="btn" onclick="triggerScreen('STATIC')"><i class="ti ti-camera"></i> Chụp ảnh màn hình</button>
-    <button class="btn secondary" onclick="triggerScreen('LIVE')"><i class="ti ti-live-view"></i> Chạy Live Stream (1 FPS)</button>
+    <button class="btn secondary" onclick="triggerScreen('LIVE')"><i class="ti ti-live-view"></i> Chạy Live Stream (30 FPS)</button>
     <button class="btn danger" id="btn-stop-screen" onclick="triggerScreen('STOP')" disabled>Dừng luồng stream</button>
   </div>
   <div class="screen-container">

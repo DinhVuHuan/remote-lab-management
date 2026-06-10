@@ -16,18 +16,18 @@ export const handleScreenTrigger = (type) => {
       <i class="ti ti-device-desktop" style="font-size:48px;color:var(--success)"></i>
       <span style="color:var(--success);font-weight:600">Đang chụp ảnh màn hình...</span>
     `;
-    // Gọi hàm logAction toàn cục (giống như cách bạn làm với Kill Process)
+    // Gọi hàm logAction toàn cục để đồng bộ audit log và bắn tín hiệu đi
     if (window.logAction) {
       window.logAction('SCREENSHOT', 'Yêu cầu chụp màn hình');
     } else {
       emitCommand('SCREENSHOT', targetMachine);
     }
   } else if (type === 'LIVE') {
-    display.innerHTML = `<div class="live-badge"><div class="blink"></div>LIVE VIEWING - 1 FPS</div>`;
+    display.innerHTML = `<div class="live-badge"><div class="blink"></div>LIVE VIEWING - 30 FPS</div>`;
     if (stopBtn) stopBtn.disabled = false;
 
     if (window.logAction) {
-      window.logAction('START_STREAM', 'Bật stream màn hình');
+      window.logAction('START_STREAM', 'Bật stream màn hình mượt mà');
     } else {
       emitCommand('START_STREAM', targetMachine);
     }
@@ -46,19 +46,26 @@ export const handleScreenTrigger = (type) => {
   }
 };
 
-// Hàm mới: Xử lý dữ liệu hình ảnh nhận được từ Socket server
+// Hàm xử lý dữ liệu hình ảnh nhận liên tục từ Socket server (Tối ưu hóa tránh đơ DOM)
 export const handleScreenData = (data) => {
   const targetMachine = getTargetMachine();
 
-  // Chỉ hiển thị hình ảnh nếu dữ liệu trả về đúng của máy đang chọn
+  // Chỉ xử lý cập nhật nếu dữ liệu trả về đúng định danh máy đang chọn
   if (data.machine_name === targetMachine) {
     const display = getElementById('screen-display-area');
     if (!display) return;
 
-    // data.image_base64 là chuỗi dạng "data:image/jpeg;base64,/9j/4AAQ..." từ Agent gửi lên
-    display.innerHTML = `
-      <img src="${data.image_base64}" alt="Remote Screen" style="width:100%; height:auto; object-fit:contain; border-radius:4px;" />
-    `;
+    // Kiểm tra xem cấu trúc thẻ img cố định đã được khởi tạo bên trong vùng hiển thị chưa
+    let img = display.querySelector('img#live-screen-img');
+
+    if (!img) {
+      // Nếu chưa có, tiến hành xóa sạch giao diện cũ (như icon loading, text thông báo) và tạo duy nhất 1 thẻ img
+      display.innerHTML = `<img id="live-screen-img" alt="Remote Screen" style="width:100%; height:auto; object-fit:contain; border-radius:4px;" />`;
+      img = display.querySelector('img#live-screen-img');
+    }
+
+    // ĐÈ TRỰC TIẾP LÊN THUỘC TÍNH SRC: Kỹ thuật này giúp trình duyệt render 30 khung hình/giây cực mượt mà không bị giật lag
+    img.src = data.image_base64;
   }
 };
 

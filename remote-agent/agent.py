@@ -5,7 +5,8 @@ import os
 import io
 import base64
 import threading
-from PIL import ImageGrab  # Thư viện chụp màn hình (hỗ trợ đa nền tảng)
+import mss  # Thư viện chụp màn hình siêu tốc bằng phần cứng
+from PIL import Image  # Chỉ giữ lại cấu phần xử lý ảnh cơ bản để nén/resize
 
 sio = socketio.Client()
 
@@ -26,22 +27,27 @@ def disconnect():
     is_streaming_screen = False
     print("❌ [DISCONNECTED] Đã mất kết nối tới Server.")
 
-# HÀM CHỤP MÀN HÌNH VÀ CHUYỂN THÀNH BASE64
+# HÀM CHỤP MÀN HÌNH VÀ CHUYỂN THÀNH BASE64 (DÙNG MSS TỐI ƯU TỐC ĐỘ)
 def capture_screen_to_base64():
     try:
-        # Chụp toàn bộ màn hình hiện tại
-        screenshot = ImageGrab.grab()
-        
-        # Nén ảnh lại một chút (ví dụ giảm kích thước xuống cỡ 70% hoặc hạ chất lượng) để truyền qua socket mượt hơn
-        # screenshot = screenshot.resize((1280, 720)) # Bỏ comment nếu muốn ép độ phân giải xuống HD cho nhẹ
-        
-        buffer = io.BytesIO()
-        # Lưu ảnh vào bộ nhớ tạm dưới định dạng JPEG với chất lượng 60% (đủ nhìn, siêu nhẹ)
-        screenshot.save(buffer, format="JPEG", quality=60)
-        
-        # Mã hóa binary của ảnh sang chuỗi mã Base64
-        img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return f"data:image/jpeg;base64,{img_str}"
+        with mss.mss() as sct:
+            # Lấy thông tin màn hình chính (Màn hình 1)
+            monitor = sct.monitors[1]
+            sct_img = sct.grab(monitor)
+            
+            # Chuyển raw bytes từ mss sang định dạng PIL Image để xử lý nén/hạ độ phân giải
+            img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
+            
+            # ÉP HẠ ĐỘ PHÂN GIẢI: Giảm xuống kích thước 960x540 để giảm dung lượng gói tin qua socket
+            img = img.resize((960, 540), Image.Resampling.LANCZOS)
+            
+            buffer = io.BytesIO()
+            # Lưu ảnh vào bộ nhớ tạm dưới định dạng JPEG với chất lượng 45% (Tối ưu tuyệt đối cho 30 FPS)
+            img.save(buffer, format="JPEG", quality=45)
+            
+            # Mã hóa binary của ảnh sang chuỗi mã Base64
+            img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return f"data:image/jpeg;base64,{img_str}"
     except Exception as e:
         print(f"❌ Lỗi khi chụp màn hình: {e}")
         return None
@@ -53,16 +59,28 @@ def send_single_screenshot():
         sio.emit('agent_send_screen', {'machine_name': MACHINE_NAME, 'image_base64': base64_image})
         print("📸 Đã gửi ảnh chụp màn hình đơn lẻ về Server.")
 
-# LUỒNG CHẠY LIVE STREAM MÀN HÌNH (1 FPS)
+# LUỒNG CHẠY LIVE STREAM MÀN HÌNH SIÊU MƯỢT (~30 FPS)
 def screen_stream_worker():
     global is_streaming_screen
-    print("🚀 Bắt đầu luồng Live Stream màn hình...")
+    print("🚀 Bắt đầu luồng Live Stream màn hình mượt mà (30 FPS)...")
+    
+    TARGET_FPS = 30
+    FRAME_INTERVAL = 1.0 / TARGET_FPS  # ~ 0.033 giây mỗi khung hình
+
     while is_streaming_screen:
+        start_time = time.time()
+        
         if sio.connected:
             base64_image = capture_screen_to_base64()
             if base64_image:
                 sio.emit('agent_send_screen', {'machine_name': MACHINE_NAME, 'image_base64': base64_image})
-        time.sleep(1) # Nghỉ 1 giây (Đạt tốc độ ~ 1 FPS theo UI thiết kế)
+        
+        # Tính toán thời gian thực thi của tác vụ chụp/gửi để trừ hao thời gian sleep nhằm giữ chuẩn FPS
+        elapsed_time = time.time() - start_time
+        sleep_time = FRAME_INTERVAL - elapsed_time
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+            
     print("🛑 Đã dừng luồng Live Stream màn hình.")
 
 # LẮNG NGHE LỆNH TỪ SERVER GỬI XUỐNG
@@ -91,15 +109,14 @@ def on_command(data):
         except Exception as e:
             print(f"❌ Không thể đóng tiến trình: {e}")
 
-    # ===== THÊM ĐOẠN XỬ LÝ SCREENSHOT VÀ STREAM VÀO ĐÂY =====
+    # XỬ LÝ CÁC HÀNH ĐỘNG SCREENSHOT VÀ LIVESTREAM 30 FPS
     elif action == 'SCREENSHOT':
-        # Chụp một phát và gửi luôn
         send_single_screenshot()
 
     elif action == 'START_STREAM':
         if not is_streaming_screen:
             is_streaming_screen = True
-            # Tạo luồng (Thread) chạy độc lập để tránh block vòng lặp chính của Agent
+            # Khởi tạo luồng Thread chạy nền độc lập để không block chu kỳ quét dữ liệu hệ thống
             stream_thread = threading.Thread(target=screen_stream_worker, daemon=True)
             stream_thread.start()
 
