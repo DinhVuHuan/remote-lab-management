@@ -56,6 +56,12 @@ io.on('connection', (socket) => {
         io.emit('server_send_procs_to_web', data);
     });
 
+    // 🎯 CHỖ MỚI SỬA: Nhận dữ liệu ảnh màn hình từ Agent và chuyển tiếp về Web App
+    socket.on('agent_send_screen', (data) => {
+        // data chứa { machine_name, image_base64 }
+        io.emit('server_send_screen_to_web', data);
+    });
+
     // 3. Xử lý khi có bất kỳ thiết bị nào (Web hoặc Agent) ngắt kết nối
     socket.on('disconnect', () => {
         console.log(`[-] Thiết bị ngắt kết nối: ${socket.id}`);
