@@ -74,6 +74,12 @@ window.logAction = (actionType, targetName) => {
   }
   console.log(`Đang phát lệnh: ${actionType} -> ${targetName} trên máy ${targetMachine}`);
   socket.emit('client_command', { action: actionType, target: targetMachine, detail: targetName });
+
+  // ĐÃ BỔ SUNG: Nếu Web phát lệnh STOP_STREAM, báo Server cho tab này rời khỏi Room của máy đó
+  if (actionType === 'STOP_STREAM') {
+    socket.emit('leave_machine_room', { target: targetMachine });
+  }
+
   addAuditRow(actionType, targetMachine, 'Đã chuyển tiếp qua Socket');
 };
 

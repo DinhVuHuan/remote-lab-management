@@ -27,6 +27,10 @@ io.on('connection', (socket) => {
     // 1. Nhận tín hiệu đăng ký định danh từ máy Kali Linux
     socket.on('agent_register', (data) => {
         registeredAgents[data.machine_name] = socket.id;
+
+        // Bắt chính máy Agent tham gia vào cái Room trùng tên với nó
+        socket.join(data.machine_name);
+
         console.log(`📌 MÁY ẢO ĐÃ ĐĂNG KÝ THÀNH CÔNG: [${data.machine_name}] -> Socket ID: ${socket.id}`);
         console.log("Danh sách máy phòng Lab đang online:", Object.keys(registeredAgents));
 
@@ -40,7 +44,13 @@ io.on('connection', (socket) => {
 
     // 2. Nhận lệnh điều khiển từ Trình duyệt Web gửi lên và chuyển tiếp (Forward) xuống Agent
     socket.on('client_command', (data) => {
-        console.log(`🎮 Web ra lệnh: [${data.action}] gửi tới máy trạm: [${data.target}]`);
+        console.log(`🎮 Web [${socket.id}] ra lệnh: [${data.action}] gửi tới máy trạm: [${data.target}]`);
+
+        // CƠ CHẾ ROOM: Khi Web ra lệnh STREAM hoặc SCREENSHOT, xếp tab Web này vào Room của máy đó
+        if (data.action === 'START_STREAM' || data.action === 'SCREENSHOT') {
+            socket.join(data.target);
+            console.log(`🚪 Tab Web [${socket.id}] đã tham gia vào Room của máy: [${data.target}]`);
+        }
 
         const agentSocketId = registeredAgents[data.target];
         if (agentSocketId) {
@@ -51,15 +61,21 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 🎯 CƠ CHẾ ROOM: Khi Web chủ động bấm STOP, cho tab Web rời khỏi Room của máy đó
+    socket.on('leave_machine_room', (data) => {
+        socket.leave(data.target);
+        console.log(`🚪 Tab Web [${socket.id}] đã rời khỏi Room của máy: [${data.target}]`);
+    });
+
     // Nhận dữ liệu tiến trình thật từ Agent và chuyển tiếp về Web App
     socket.on('agent_send_procs', (data) => {
         io.emit('server_send_procs_to_web', data);
     });
 
-    // 🎯 CHỖ MỚI SỬA: Nhận dữ liệu ảnh màn hình từ Agent và chuyển tiếp về Web App
+    // 🎯 CHỖ ĐÃ SỬA: Nhận ảnh từ Agent và CHỈ BẮN VỀ CHO AI ĐANG Ở TRONG ROOM MÁY ĐÓ
     socket.on('agent_send_screen', (data) => {
-        // data chứa { machine_name, image_base64 }
-        io.emit('server_send_screen_to_web', data);
+        // io.to(tên_máy) đảm bảo tab xem máy 1 nhận ảnh máy 1, tab xem máy 2 nhận ảnh máy 2
+        io.to(data.machine_name).emit('server_send_screen_to_web', data);
     });
 
     // 3. Xử lý khi có bất kỳ thiết bị nào (Web hoặc Agent) ngắt kết nối

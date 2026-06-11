@@ -16,7 +16,6 @@ export const handleScreenTrigger = (type) => {
       <i class="ti ti-device-desktop" style="font-size:48px;color:var(--success)"></i>
       <span style="color:var(--success);font-weight:600">Đang chụp ảnh màn hình...</span>
     `;
-    // Gọi hàm logAction toàn cục để đồng bộ audit log và bắn tín hiệu đi
     if (window.logAction) {
       window.logAction('SCREENSHOT', 'Yêu cầu chụp màn hình');
     } else {
@@ -50,7 +49,7 @@ export const handleScreenTrigger = (type) => {
 export const handleScreenData = (data) => {
   const targetMachine = getTargetMachine();
 
-  // Chỉ xử lý cập nhật nếu dữ liệu trả về đúng định danh máy đang chọn
+  // Chỉ xử lý cập nhật nếu dữ liệu trả về đúng định danh máy đang chọn ở tab hiện tại
   if (data.machine_name === targetMachine) {
     const display = getElementById('screen-display-area');
     if (!display) return;
@@ -59,12 +58,12 @@ export const handleScreenData = (data) => {
     let img = display.querySelector('img#live-screen-img');
 
     if (!img) {
-      // Nếu chưa có, tiến hành xóa sạch giao diện cũ (như icon loading, text thông báo) và tạo duy nhất 1 thẻ img
+      // Nếu chưa có, tiến hành xóa sạch giao diện cũ và tạo duy nhất 1 thẻ img cố định
       display.innerHTML = `<img id="live-screen-img" alt="Remote Screen" style="width:100%; height:auto; object-fit:contain; border-radius:4px;" />`;
       img = display.querySelector('img#live-screen-img');
     }
 
-    // ĐÈ TRỰC TIẾP LÊN THUỘC TÍNH SRC: Kỹ thuật này giúp trình duyệt render 30 khung hình/giây cực mượt mà không bị giật lag
+    // ĐÈ TRỰC TIẾP LÊN THUỘC TÍNH SRC: Kỹ thuật giúp cập nhật 30 FPS mượt mà
     img.src = data.image_base64;
   }
 };
